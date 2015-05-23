@@ -1,0 +1,61 @@
+#!/system/bin/sh
+
+if busybox test ! -d /system/etc/init.d; then
+    busybox mkdir /system/etc/init.d
+fi
+
+for lScript in \
+        /system/etc/init.d/10diskManager.rc \
+        /system/etc/init.d/03sdcard \
+        /system/etc/init.d/*2sd \
+        /system/etc/init.d/*2sdx \
+        /system/etc/init.d/*2ext \
+        /system/etc/init.d/*2s \
+        /system/etc/init.d/*2x \
+        /system/etc/init.d/*swap \
+        /system/etc/init.d/*internal \
+        /system/etc/init.d/*internalsd \
+        /system/etc/init.d/*mountdl \
+        /system/etc/init.d/*mountext \
+        /system/etc/init.d/*mountsd \
+        /system/etc/init.d/*cache
+do
+    if busybox test -e $lScript; then
+        busybox rm -rf $lScript
+    fi
+done
+
+# Find and remove anything related to Link2SD
+for lLocation in /data /sd-ext /system; do
+    for lApk in `busybox find $lLocation -iname "com.buak.Link2SD*"`; do
+        if busybox test -e $lApk; then
+            busybox rm -rf $lApk
+        fi
+    done
+done
+
+# Also remove any Link2SD related mounts in /system/etc/install-recovery.sh
+if busybox test -f /system/etc/install-recovery.sh; then
+    cat /system/etc/install-recovery.sh | while read line; do
+        if ! busybox echo $line | busybox grep -q '/data/sdext' && ! busybox echo $line | busybox grep -q '/dev/block/mmcblk'; then
+            busybox echo $line >> /system/etc/install-recovery.sh.tmp
+        fi
+    done
+
+    busybox cat /system/etc/install-recovery.sh.tmp > /system/etc/install-recovery.sh
+    busybox rm -rf /system/etc/install-recovery.sh.tmp
+fi
+
+# Remove CM's ZRAM script as it will overwrite anything done by Mounts2SD
+if busybox test -e /system/bin/compcache; then
+    busybox chmod 0644 /system/bin/compcache
+fi
+
+# Add a work-around for the ramdisk built-in DTa2sd
+if busybox test -f /system/etc/init.d/dtapp; then
+busybox rm -rf /system/etc/init.d/dtapp
+busybox cat << EOF>/system/etc/init.d/00dtapp-disabler
+#!/system/bin/bash
+/sbin/busybox umount /system/sd
+EOF
+fi
